@@ -11,18 +11,22 @@ load_dotenv()
 ############ modify this for your prometheus variables #############
 # There are different types of variables accepted by prometheus,
 # since these are all point measurements in time, Gauge is the right choice
-temp = Gauge('temperature', 'Weather Station Temperature')
-hum = Gauge('humidity', 'Weather Station Humidity')
-alt = Gauge('altitude', 'Weather Station Altitude')
-pres = Gauge('pressure', 'Weather Station Pressure')
-dist = Gauge('distance', 'Weather Station Distance')
+tempOut = Gauge('temperature', 'Weather Station Temperature')
+humOut = Gauge('humidity', 'Weather Station Humidity')
+altOut = Gauge('altitude', 'Weather Station Altitude')
+presOut = Gauge('pressure', 'Weather Station Pressure')
+distOut = Gauge('distance', 'Weather Station Distance')
+
+tempIn = Gauge('temperature', 'Internal Room Temperature')
+humIn = Gauge('humidity', 'Internal Room Humidity')
+presIn = Gauge('pressure', 'Internal Room Pressure')
+distIn = Gauge('distance', 'Internal Room Distance')
 #####################################################################
 
 ############ modify this for your mqtt config ##############
 MQTT_ADDRESS = os.environ.get("MQTT_ADDRESS") 
 MQTT_USER = os.environ.get("MQTT_USER") 
 MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD") 
-MQTT_TOPIC = 'outdoor/weather/temperature'
 MQTT_REGEX = 'home/([^/]+)/([^/]+)'
 MQTT_CLIENT_ID = 'Zeus'
 ########################################################
@@ -32,9 +36,9 @@ def on_connect(client, userdata, flags, rc):
     # There are various mqtt connect codes, only needed if debugging
     print('Connected with result code ' + str(rc)) 
     # Subscribe mqtt to the following variables
-    client.subscribe([('outdoor/weather/temperature',1),('outdoor/weather/humidity',1),
-                      ('outdoor/weather/altitude',1),('outdoor/weather/pressure',1),
-                      ('outdoor/weather/distance',1)])
+    client.subscribe([('indoor/conditions/temperature',1),('indoor/conditions/humidity',1),
+                      ('indoor/conditions/light',1),('indoor/conditions/pressure',1),
+                      ('indoor/conditions/distance',1)])
 
 def process_request(msg):
     """A function to read the published data over mqtt."""
@@ -51,23 +55,23 @@ def process_request(msg):
     # Make sure we associate prometheus logs with the correct mqtt variable
     # This publishes the mqtt variables to a prometheus gauge  
     # Also insert the data into the SQLite table 
-    if msg.topic ==  'outdoor/weather/temperature':
+    if msg.topic ==  'indoor/conditions/temperature':
         temp.set(msg.payload)
         sqlMsg = (str(timeVal),str(goodMsg),None,None,None);
         insert_database(sqlMsg)
-    elif msg.topic == 'outdoor/weather/humidity':
+    elif msg.topic == 'indoor/conditions/humidity':
         hum.set(msg.payload)
         sqlMsg = (str(timeVal),None,str(goodMsg),None,None);
         insert_database(sqlMsg)
-    elif msg.topic == 'outdoor/weather/altitude':
+    elif msg.topic == 'indoor/conditions/light':
         alt.set(msg.payload)
         sqlMsg = (str(timeVal),None,None,None,str(goodMsg));
         insert_database(sqlMsg)
-    elif msg.topic == 'outdoor/weather/pressure':
+    elif msg.topic == 'indoor/conditions/pressure':
         pres.set(msg.payload)
         sqlMsg = (str(timeVal),None,None,str(goodMsg),None);
         insert_database(sqlMsg)
-    elif msg.topic == 'outdoor/weather/distance':
+    elif msg.topic == 'indoor/conditions/distance':
         dist.set(msg.payload)
     else:
         print('Incorrect topic')

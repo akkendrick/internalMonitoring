@@ -24,17 +24,17 @@ float bmeData[4];
 #define US100_PWR 7
 #define US100_TRIG 4
 #define US100_ECHO 5
-
+#define BH_PWR 3
 // Create an rtc object for tracking time
 RTCZero rtc;
 
 // MQTT properties
-const char* mqtt_server = "192.168.50.111";  // IP address of the MQTT broker
-const char* temp_topic = "indoor/office/temperature";
-const char* humid_topic = "indoor/office/humidity";
-const char* pressure_topic = "indoor/office/pressure";
-const char* altitude_topic = "indoor/office/altitude";
-const char* distance_topic = "indoor/office/distance";
+const char* mqtt_server = "192.168.50.13";  // IP address of the MQTT broker
+const char* temp_topic = "indoor/conditions/temperature";
+const char* humid_topic = "indoor/conditionshumidity";
+const char* pressure_topic = "indoor/conditionspressure";
+const char* distance_topic = "indoor/conditions/distance";
+const char* light_topic = "indoor/conditions/light";
 const char* mqtt_username = MQTT_user; // MQTT username
 const char* mqtt_password = MQTT_pass; // MQTT password
 const char* clientID = "arduino"; // MQTT client ID
@@ -331,8 +331,6 @@ void loop() {
     delay(10); // This delay ensures that BME data upload is all good
     client.publish(humid_topic, String(bmeData[3]).c_str());
     delay(10); // This delay ensures that BME data upload is all good
-    client.publish(altitude_topic, String(bmeData[2]).c_str());
-    delay(10); // This delay ensures that BME data upload is all good
     client.publish(pressure_topic, String(bmeData[1]).c_str());
     delay(10);
     client.publish(distance_topic, String(accumulatedHeight).c_str());
@@ -362,7 +360,7 @@ void loop() {
 
   Serial.println("Going to sleep");
 
-  delay(int(sleepTime));
+  //delay(int(sleepTime));
   
   digitalWrite(LED_BUILTIN, HIGH);    
 
