@@ -11,11 +11,12 @@ load_dotenv()
 ############ modify this for your prometheus variables #############
 # There are different types of variables accepted by prometheus,
 # since these are all point measurements in time, Gauge is the right choice
-tempOut = Gauge('temperature', 'Weather Station Temperature')
-humOut = Gauge('humidity', 'Weather Station Humidity')
-altOut = Gauge('altitude', 'Weather Station Altitude')
-presOut = Gauge('pressure', 'Weather Station Pressure')
-distOut = Gauge('distance', 'Weather Station Distance')
+
+# tempOut = Gauge('temperature', 'Weather Station Temperature')
+# humOut = Gauge('humidity', 'Weather Station Humidity')
+# altOut = Gauge('altitude', 'Weather Station Altitude')
+# presOut = Gauge('pressure', 'Weather Station Pressure')
+# distOut = Gauge('distance', 'Weather Station Distance')
 
 tempIn = Gauge('temperature', 'Internal Room Temperature')
 humIn = Gauge('humidity', 'Internal Room Humidity')
