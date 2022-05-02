@@ -114,7 +114,7 @@ def insert_database(sqlMsg):
     """Save the weather data into a database"""
 
     databasePath =  os.environ.get("SQL_PATH")
-    databasePath = str(databasePath)+"/mqtt.sqlite"
+    databasePath = str(databasePath)+"/mqtt_indoor.sqlite"
     
     conn = sqlite3.connect(databasePath)
     
