@@ -11,6 +11,10 @@
 #include <RTCZero.h>
 #include <WiFiNINA.h>
 #include "arduino_secrets.h"
+#include <hp_BH1750.h>  //  include the library
+
+hp_BH1750 BH1750;       //  create the sensor
+
 
 // Define wifi parameters
 char ssid[] = SECRET_SSID;
@@ -31,8 +35,8 @@ RTCZero rtc;
 // MQTT properties
 const char* mqtt_server = "192.168.50.13";  // IP address of the MQTT broker
 const char* temp_topic = "indoor/conditions/temperature";
-const char* humid_topic = "indoor/conditionshumidity";
-const char* pressure_topic = "indoor/conditionspressure";
+const char* humid_topic = "indoor/conditions/humidity";
+const char* pressure_topic = "indoor/conditions/pressure";
 const char* distance_topic = "indoor/conditions/distance";
 const char* light_topic = "indoor/conditions/light";
 const char* mqtt_username = MQTT_user; // MQTT username
@@ -62,6 +66,7 @@ unsigned int HighLen = 0;
 unsigned int LowLen  = 0;
 unsigned int Len_mm  = 0;
 
+float lux;
 
 /****************************************
 * Auxiliary Functions
@@ -123,12 +128,11 @@ void getBMEData(float bmeData[4]) {
     float bmePressure;
 
     bool BMEstarted = false;
-
+    
     // Power ON the BME280 board
-    pinMode(BME_PWR, OUTPUT);
-    digitalWrite(BME_PWR, HIGH);
-    delay(50);
-
+    //pinMode(BME_PWR, OUTPUT);
+    //digitalWrite(BME_PWR, HIGH);
+    
     unsigned status;
     status = bme.begin();  
 
@@ -179,15 +183,16 @@ void getBMEData(float bmeData[4]) {
         bmeData[2] = 0;  
         bmeData[3] = 0;
       }
+      
 
-  
+      //digitalWrite(BME_PWR, LOW);
 
-    
 }
 
 float getUS100Data()  {
   long timeHigh;
 
+    
   // Power ON the US-100 board
   pinMode(US100_PWR, OUTPUT);
   digitalWrite(US100_PWR, HIGH);
@@ -210,10 +215,31 @@ float getUS100Data()  {
   // this is in microseconds
   timeHigh = pulseIn(US100_ECHO, HIGH);
   US100_time = timeHigh;
-
+  
+  digitalWrite(US100_PWR, LOW);
   return US100_time;
 }
 
+
+float getLightData() {
+    // Power ON the BH1750
+    pinMode(BH_PWR, OUTPUT);
+    digitalWrite(BH_PWR, HIGH);
+    
+  bool avail = BH1750.begin(BH1750_TO_GROUND);
+  
+  BH1750.start();
+  lux=BH1750.getLux();  //  waits until a conversion finished
+  Serial.print("BH1750 status:");
+  Serial.println(avail); 
+  Serial.print("The current lumens are:"); 
+  Serial.println(lux);  
+  
+  digitalWrite(BH_PWR, LOW);
+
+  return lux;
+
+}
 /****************************************
  * Main Functions
 ****************************************/
@@ -228,10 +254,9 @@ void setup() {
 
     Serial.println();
 
-    pinMode(US100_PWR, OUTPUT);
-    digitalWrite(US100_PWR, HIGH);
-    pinMode(US100_TRIG, OUTPUT);
-    pinMode(US100_ECHO, INPUT);
+    // Power ON the BME280 board
+    pinMode(BME_PWR, OUTPUT);
+    digitalWrite(BME_PWR, HIGH);
 
 }
 
@@ -253,8 +278,9 @@ void loop() {
   delay(10); // This delay ensures that client.publish doesn't clash with the client.connect call
   
   getBMEData(bmeData);
-  delay(10); // This delay ensures that BME data is all good
+  delay(100); // This delay ensures that BME data is all good
   printValues();
+  
   // Use temperature to calculate speed of sound, this is in m/s
   double soundSpeed;
   soundSpeed = 331.3 + 0.606 * bmeData[0];
@@ -324,7 +350,8 @@ void loop() {
   Serial.print("The raw distance is (mm):");
   Serial.println(US100_distance);
 
-
+  // Get light sensor data
+  lux = getLightData();
 
   // Publish all data to the MQTT Broker
   if (client.publish(temp_topic, String(bmeData[0]).c_str())) {
@@ -335,9 +362,12 @@ void loop() {
     delay(10);
     client.publish(distance_topic, String(accumulatedHeight).c_str());
     delay(10);
+    client.publish(light_topic, String(lux).c_str());
+    delay(10);
 
     // Sleep for 15 minutes if all is good
-    sleepTime = 9000;
+    //sleepTime = 9000;
+    sleepTime = 2000;
 
     Serial.println("Weather data sent!");
   }
@@ -357,10 +387,13 @@ void loop() {
 
   // Using built-in LED to indicate when it is awake
   digitalWrite(LED_BUILTIN, LOW);   
+  digitalWrite(BME_PWR, LOW);
 
   Serial.println("Going to sleep");
 
-  //delay(int(sleepTime));
+  //LowPower.sleep(int(sleepTime));
+
+  delay(int(sleepTime));
   
   digitalWrite(LED_BUILTIN, HIGH);    
 
