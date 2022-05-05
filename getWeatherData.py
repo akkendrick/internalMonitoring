@@ -4,6 +4,7 @@ import time
 import datetime
 import sqlite3
 import os
+import requests
 from dotenv import load_dotenv
 from sqlite3 import Error
 load_dotenv()
@@ -22,7 +23,15 @@ tempIn = Gauge('temperature', 'Internal Room Temperature')
 humIn = Gauge('humidity', 'Internal Room Humidity')
 presIn = Gauge('pressure', 'Internal Room Pressure')
 distIn = Gauge('distance', 'Internal Room Distance')
+altIn = Gauge('distance', 'Internal Room Altitude')
+lightIn = Gauge('light', 'Internal Room Light')
 #####################################################################
+
+#####################################################################
+# Specify Hue URL 
+HueIP = os.environ.get("HUE_IP")
+URL = "http://"+string(HUE_IP)+"/debug/clip.html"
+HueUser = os.environ.get("HUE_USER")
 
 ############ modify this for your mqtt config ##############
 MQTT_ADDRESS = os.environ.get("MQTT_ADDRESS") 
@@ -38,6 +47,7 @@ def on_connect(client, userdata, flags, rc):
     print('Connected with result code ' + str(rc)) 
     # Subscribe mqtt to the following variables
     client.subscribe([('indoor/conditions/temperature',1),('indoor/conditions/humidity',1),
+                      ('indoor/conditions/altitude',1),
                       ('indoor/conditions/light',1),('indoor/conditions/pressure',1),
                       ('indoor/conditions/distance',1)])
 
@@ -57,23 +67,27 @@ def process_request(msg):
     # This publishes the mqtt variables to a prometheus gauge  
     # Also insert the data into the SQLite table 
     if msg.topic ==  'indoor/conditions/temperature':
-        temp.set(msg.payload)
+        tempIn.set(msg.payload)
         sqlMsg = (str(timeVal),str(goodMsg),None,None,None);
         insert_database(sqlMsg)
     elif msg.topic == 'indoor/conditions/humidity':
-        hum.set(msg.payload)
+        humIn.set(msg.payload)
         sqlMsg = (str(timeVal),None,str(goodMsg),None,None);
         insert_database(sqlMsg)
-    elif msg.topic == 'indoor/conditions/light':
-        alt.set(msg.payload)
-        sqlMsg = (str(timeVal),None,None,None,str(goodMsg));
+    elif msg.topic == 'indoor/conditions/altitude':
+        altIn.set(msg.payload)
+        sqlMsg = (str(timeVal),None,str(goodMsg),None,None);
         insert_database(sqlMsg)
     elif msg.topic == 'indoor/conditions/pressure':
-        pres.set(msg.payload)
+        presIn.set(msg.payload)
         sqlMsg = (str(timeVal),None,None,str(goodMsg),None);
         insert_database(sqlMsg)
     elif msg.topic == 'indoor/conditions/distance':
-        dist.set(msg.payload)
+        distIn.set(msg.payload)
+    elif msg.topic == 'indoor/conditions/light':
+        lightIn.set(msg.payload)
+        lightLum = msg.payload
+        send_hueUpdate(lightLum)
     else:
         print('Incorrect topic')
 
@@ -81,6 +95,19 @@ def on_message(client, userdata, msg):
     """ Run the following command when a MQTT message is received""" 
     process_request(msg)
     
+def send_hueUpdate(lumVal):
+    """Update hue lights according to light value"""
+    putData = {"on":true}
+    urlString = 'https://'+HueIP+'/'+HueUser+'/lights/3/state'
+    r = requests.put(urlString,data=putData)
+    
+    # check status code for response received
+    # success code - 200
+    print(r)
+     
+    # print content of request
+    print(r.content)
+
 def setup_database():
     """Set up the database for storing the data sent by mqtt"""
     databasePath =  os.environ.get("SQL_PATH")
