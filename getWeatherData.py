@@ -23,14 +23,14 @@ tempIn = Gauge('temperature', 'Internal Room Temperature')
 humIn = Gauge('humidity', 'Internal Room Humidity')
 presIn = Gauge('pressure', 'Internal Room Pressure')
 distIn = Gauge('distance', 'Internal Room Distance')
-altIn = Gauge('distance', 'Internal Room Altitude')
+altIn = Gauge('altitude', 'Internal Room Altitude')
 lightIn = Gauge('light', 'Internal Room Light')
 #####################################################################
 
 #####################################################################
 # Specify Hue URL 
 HueIP = os.environ.get("HUE_IP")
-URL = "http://"+string(HUE_IP)+"/debug/clip.html"
+URL = "http://"+HueIP+"/debug/clip.html"
 HueUser = os.environ.get("HUE_USER")
 
 ############ modify this for your mqtt config ##############
@@ -86,7 +86,7 @@ def process_request(msg):
         distIn.set(msg.payload)
     elif msg.topic == 'indoor/conditions/light':
         lightIn.set(msg.payload)
-        lightLum = msg.payload
+        lightLum = goodMsg
         send_hueUpdate(lightLum)
     else:
         print('Incorrect topic')
@@ -97,21 +97,43 @@ def on_message(client, userdata, msg):
     
 def send_hueUpdate(lumVal):
     """Update hue lights according to light value"""
-    putData = {"on":true}
-    urlString = 'https://'+HueIP+'/'+HueUser+'/lights/3/state'
-    r = requests.put(urlString,data=putData)
-    
-    # check status code for response received
-    # success code - 200
-    print(r)
-     
-    # print content of request
-    print(r.content)
+
+    if float(lumVal) < 20:
+        print('Sending Hue Update to turn on')
+        putData = '{"on":true}'
+        headers = {
+            'Accept': 'application/json',
+        }
+        urlString = 'http://'+str(HueIP)+'/api/'+str(HueUser)+'/lights/3/state'
+        r = requests.put(urlString,headers=headers, data=putData)
+        
+        # check status code for response received
+        # success code - 200
+        print(r)
+         
+        # print content of request
+        print(r.content)
+    else:
+        print('Sending Hue Update to turn off')
+        putData = '{"on":false}'
+        headers = {
+            'Accept': 'application/json',
+        }
+        urlString = 'http://'+str(HueIP)+'/api/'+str(HueUser)+'/lights/3/state'
+        r = requests.put(urlString,headers=headers, data=putData)
+        
+        # check status code for response received
+        # success code - 200
+        print(r)
+         
+        # print content of request
+        print(r.content)
+
 
 def setup_database():
     """Set up the database for storing the data sent by mqtt"""
     databasePath =  os.environ.get("SQL_PATH")
-    databasePath = str(databasePath)+"/mqtt.sqlite"
+    databasePath = str(databasePath)+"/mqtt_indoor.sqlite"
     
     conn = None
     try:
