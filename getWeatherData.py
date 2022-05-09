@@ -19,12 +19,12 @@ load_dotenv()
 # presOut = Gauge('pressure', 'Weather Station Pressure')
 # distOut = Gauge('distance', 'Weather Station Distance')
 
-tempIn = Gauge('temperature', 'Internal Room Temperature')
-humIn = Gauge('humidity', 'Internal Room Humidity')
-presIn = Gauge('pressure', 'Internal Room Pressure')
-distIn = Gauge('distance', 'Internal Room Distance')
-altIn = Gauge('altitude', 'Internal Room Altitude')
-lightIn = Gauge('light', 'Internal Room Light')
+temp = Gauge('temperature', 'Internal Room Temperature')
+hum = Gauge('humidity', 'Internal Room Humidity')
+pres = Gauge('pressure', 'Internal Room Pressure')
+dist = Gauge('distance', 'Internal Room Distance')
+alt = Gauge('altitude', 'Internal Room Altitude')
+light = Gauge('light', 'Internal Room Light')
 #####################################################################
 
 #####################################################################
@@ -67,25 +67,25 @@ def process_request(msg):
     # This publishes the mqtt variables to a prometheus gauge  
     # Also insert the data into the SQLite table 
     if msg.topic ==  'indoor/conditions/temperature':
-        tempIn.set(msg.payload)
+        temp.set(msg.payload)
         sqlMsg = (str(timeVal),str(goodMsg),None,None,None);
         insert_database(sqlMsg)
     elif msg.topic == 'indoor/conditions/humidity':
-        humIn.set(msg.payload)
+        hum.set(msg.payload)
         sqlMsg = (str(timeVal),None,str(goodMsg),None,None);
         insert_database(sqlMsg)
     elif msg.topic == 'indoor/conditions/altitude':
-        altIn.set(msg.payload)
+        alt.set(msg.payload)
         sqlMsg = (str(timeVal),None,str(goodMsg),None,None);
         insert_database(sqlMsg)
     elif msg.topic == 'indoor/conditions/pressure':
-        presIn.set(msg.payload)
+        pres.set(msg.payload)
         sqlMsg = (str(timeVal),None,None,str(goodMsg),None);
         insert_database(sqlMsg)
     elif msg.topic == 'indoor/conditions/distance':
-        distIn.set(msg.payload)
+        dist.set(msg.payload)
     elif msg.topic == 'indoor/conditions/light':
-        lightIn.set(msg.payload)
+        light.set(msg.payload)
         lightLum = goodMsg
         send_hueUpdate(lightLum)
     else:
@@ -96,9 +96,13 @@ def on_message(client, userdata, msg):
     process_request(msg)
     
 def send_hueUpdate(lumVal):
-    """Update hue lights according to light value"""
+    """Update hue lights according to light value and time of day"""
 
-    if float(lumVal) < 20:
+    now = datetime.datetime.now()
+    todayLate = now.replace(hour=23, minute=0, second=0, microsecond=0)
+    todayEarly = now.replace(hour=6, minute=30, second=0, microsecond=0)
+
+    if (float(lumVal) < 20) and (now < todayLate) and (now > todayEarly):
         print('Sending Hue Update to turn on')
         putData = '{"on":true}'
         headers = {
