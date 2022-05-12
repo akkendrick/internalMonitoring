@@ -1,2 +1,6 @@
 
 *.h
+.env
+hueAPITest.py
+huePyTest.py
+timeTest.py
