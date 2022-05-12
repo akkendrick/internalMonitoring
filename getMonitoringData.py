@@ -4,9 +4,9 @@ import time
 import datetime
 import sqlite3
 import os
-import requests
 from dotenv import load_dotenv
 from sqlite3 import Error
+from phue import Bridge
 load_dotenv()
 
 ############ modify this for your prometheus variables #############
@@ -28,10 +28,8 @@ light = Gauge('light', 'Internal Room Light')
 #####################################################################
 
 #####################################################################
-# Specify Hue URL 
+# Specify Hue IP 
 HueIP = os.environ.get("HUE_IP")
-URL = "http://"+HueIP+"/debug/clip.html"
-HueUser = os.environ.get("HUE_USER")
 
 ############ modify this for your mqtt config ##############
 MQTT_ADDRESS = os.environ.get("MQTT_ADDRESS") 
@@ -98,40 +96,25 @@ def on_message(client, userdata, msg):
 def send_hueUpdate(lumVal):
     """Update hue lights according to light value and time of day"""
 
+    # Specify times of day to limit hue updates
     now = datetime.datetime.now()
     todayLate = now.replace(hour=23, minute=0, second=0, microsecond=0)
     todayEarly = now.replace(hour=6, minute=30, second=0, microsecond=0)
 
-    if (float(lumVal) < 20) and (now < todayLate) and (now > todayEarly):
+    # Set up Hue bridge connection
+    b = Bridge(HueIP)
+    b.get_api()
+
+    # Check if luminosity and time meet conditions to turn on
+    if (float(lumVal) < 10) and (now < todayLate) and (now > todayEarly):
         print('Sending Hue Update to turn on')
-        putData = '{"on":true}'
-        headers = {
-            'Accept': 'application/json',
-        }
-        urlString = 'http://'+str(HueIP)+'/api/'+str(HueUser)+'/lights/3/state'
-        r = requests.put(urlString,headers=headers, data=putData)
         
-        # check status code for response received
-        # success code - 200
-        print(r)
-         
-        # print content of request
-        print(r.content)
+        b.set_light('Table','on',True)
     else:
         print('Sending Hue Update to turn off')
-        putData = '{"on":false}'
-        headers = {
-            'Accept': 'application/json',
-        }
-        urlString = 'http://'+str(HueIP)+'/api/'+str(HueUser)+'/lights/3/state'
-        r = requests.put(urlString,headers=headers, data=putData)
         
-        # check status code for response received
-        # success code - 200
-        print(r)
-         
-        # print content of request
-        print(r.content)
+        b.set_light('Table','on',False)
+
 
 
 def setup_database():
