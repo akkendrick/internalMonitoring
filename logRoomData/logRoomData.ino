@@ -3,8 +3,6 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <Arduino.h>
-#include "certificates.h"
-#include "config.h"
 #include <stdio.h>
 #include "PubSubClient.h"
 #include <ArduinoLowPower.h>
