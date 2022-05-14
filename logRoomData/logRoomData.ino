@@ -109,11 +109,11 @@ void connect_MQTT(){
   // Connect to MQTT Broker
   // client.connect returns a boolean value to let us know if the connection was successful.
   if (client.connect(clientID, mqtt_username, mqtt_password)) {
-    delay(10000);
+    delay(1000);
     Serial.println("Connected to MQTT Broker!");
   }
   else {
-    delay(10000);
+    delay(1000);
     Serial.println("Connection to MQTT Broker failed...");
   }
 }
@@ -271,14 +271,20 @@ void loop() {
   float US100_time3;
   float US100_avgTime;  
   float accumulatedHeight;
+  bool MQTTBool;
+  bool MQTTfail;
   
   connect_MQTT();
-  delay(10); // This delay ensures that client.publish doesn't clash with the client.connect call
   
+  // Get BME data
+  ///////////////////////////////////////////////////
   getBMEData(bmeData);
   delay(100); // This delay ensures that BME data is all good
   printValues();
-  
+  ///////////////////////////////////////////////////
+
+  // Get distance data
+  ///////////////////////////////////////////////////
   // Use temperature to calculate speed of sound, this is in m/s
   double soundSpeed;
   soundSpeed = 331.3 + 0.606 * bmeData[0];
@@ -344,39 +350,85 @@ void loop() {
   US100_distance = soundSpeed * US100_avgTime / 2000;
   // Use defined box distance to calculate accumulation
   accumulatedHeight = boxDistance - US100_distance;
-
+  
   Serial.print("The raw distance is (mm):");
   Serial.println(US100_distance);
 
   // Get light sensor data
+  ///////////////////////////////////////////////////
   lux = getLightData();
 
+  ///////////////////////////////////////////////////
   // Publish all data to the MQTT Broker
-  if (client.publish(temp_topic, String(bmeData[0]).c_str())) {
-    delay(10); // This delay ensures that BME data upload is all good
-    client.publish(humid_topic, String(bmeData[3]).c_str());
-    delay(10); // This delay ensures that BME data upload is all good
-    client.publish(pressure_topic, String(bmeData[1]).c_str());
-    delay(10);
-    client.publish(distance_topic, String(accumulatedHeight).c_str());
-    delay(10);
-    client.publish(light_topic, String(lux).c_str());
-    delay(10);
-
-    // Sleep for 15 minutes if all is good
-    //sleepTime = 9000;
-    sleepTime = 2000;
-
-    Serial.println("Weather data sent!");
+  MQTTBool = client.publish(temp_topic, String(bmeData[0]).c_str());
+  MQTTfail = false;
+  if (MQTTBool) {
+    Serial.println("Temperature Data Sent");
+  }
+  else {
+    Serial.println("Temperature data failed to send.");
+    // Sleep and try again
+    MQTTfail = true;
   }
 
-  // client.publish will return a boolean value depending on whether it succeded or not.
-  // If the message failed to send, we will go to sleep, and try again in 5 minutes
+  delay(100); // This delay ensures that BME data upload is all good
+  MQTTBool = client.publish(humid_topic, String(bmeData[3]).c_str());
+  if (MQTTBool) {
+    Serial.println("Humidity Data Sent");
+  }
   else {
-    Serial.println("Weather data failed to send. Going to sleep and will just keep trying.");
+    Serial.println("Humidity data failed to send.");
+    // Sleep and try again
+    MQTTfail = true;
+  }
 
-    // Sleep for 5 minutes and try again
-    sleepTime = 3000;
+  delay(100); // This delay ensures that BME data upload is all good
+  MQTTBool = client.publish(pressure_topic, String(bmeData[1]).c_str());
+  if (MQTTBool) {
+    Serial.println("Pressure Data Sent");
+  }
+  else {
+    Serial.println("Pressure data failed to send.");
+    // Sleep and try again
+    MQTTfail = true;
+  }
+
+  delay(100); // This delay ensures that BME data upload is all good
+  MQTTBool = client.publish(distance_topic, String(accumulatedHeight).c_str());
+  if (MQTTBool) {
+    Serial.println("Distance Data Sent");
+  }
+  else {
+    Serial.println("Distance data failed to send.");
+    // Sleep and try again
+    MQTTfail = true;
+  }
+
+  delay(100); // This delay ensures that BME data upload is all good
+  MQTTBool = client.publish(light_topic, String(lux).c_str());
+  if (MQTTBool) {
+    Serial.println("Light Data Sent");
+  }
+  else {
+    Serial.println("Light data failed to send.");
+    // Sleep and try again
+    MQTTfail = true;
+  }
+  delay(100); // This delay ensures that BME data upload is all good
+  ///////////////////////////////////////////////////
+
+  if (MQTTfail) {
+    // Sleep for a short time if all is not good
+    //sleepTime = 9000;
+    sleepTime = 5000;
+
+    Serial.println("Weather data failed to send");
+  }
+  else {
+      Serial.println("Weather data sent!");
+
+      // Sleep for a long time if all is  good
+      sleepTime = 20000;
   }
 
   client.disconnect();  // disconnect from the MQTT broker
@@ -389,7 +441,7 @@ void loop() {
 
   Serial.println("Going to sleep");
 
-  //LowPower.sleep(int(sleepTime));
+  LowPower.sleep(int(sleepTime));
 
   delay(int(sleepTime));
   
