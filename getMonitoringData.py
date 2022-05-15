@@ -13,12 +13,6 @@ load_dotenv()
 # There are different types of variables accepted by prometheus,
 # since these are all point measurements in time, Gauge is the right choice
 
-# tempOut = Gauge('temperature', 'Weather Station Temperature')
-# humOut = Gauge('humidity', 'Weather Station Humidity')
-# altOut = Gauge('altitude', 'Weather Station Altitude')
-# presOut = Gauge('pressure', 'Weather Station Pressure')
-# distOut = Gauge('distance', 'Weather Station Distance')
-
 temp = Gauge('temperature', 'Internal Room Temperature')
 hum = Gauge('humidity', 'Internal Room Humidity')
 pres = Gauge('pressure', 'Internal Room Pressure')
@@ -96,23 +90,40 @@ def on_message(client, userdata, msg):
 def send_hueUpdate(lumVal):
     """Update hue lights according to light value and time of day"""
 
-    # Specify times of day to limit hue updates
-    now = datetime.datetime.now()
-    todayLate = now.replace(hour=23, minute=0, second=0, microsecond=0)
-    todayEarly = now.replace(hour=6, minute=30, second=0, microsecond=0)
+  
 
     # Set up Hue bridge connection
     b = Bridge(HueIP)
     b.get_api()
 
     # Check if luminosity and time meet conditions to turn on
-    if (float(lumVal) < 10) and (now < todayLate) and (now > todayEarly):
-        print('Sending Hue Update to turn on')
-        
-        b.set_light('Table','on',True)
+    # I could set a schedule, leaving it this way for now
+    if (float(lumVal) < 10) 
+        # Specify times of day to limit hue updates
+        now = datetime.datetime.now()
+        todayLateLim = now.replace(hour=23, minute=45, second=0, microsecond=0)
+        todayLate = now.replace(hour=20, minute=30, second=0, microsecond=0)
+        todayEarly = now.replace(hour=6, minute=30, second=0, microsecond=0)
+        todayAft = now.replace(hour=17, minute=0, second=0, microsecond=0)
+        todayDinner = now.replace(hour=18,minute=30,second=0,microsecond=0)
+
+        if now > todayEarly:
+            if (now < todayAft):
+                print('Late afternoon case')
+                b.set_light('Table','on',True)
+                b.set_light('Table','ct',175)
+            elif (now > todayDinner) and (now < todayLate):
+                print('Dinner case')
+                b.set_light('Table','on',True)
+                b.set_light('Table','ct',315)
+            elif (now > todayLate) and (now < todayLateLim)
+                print('Late Case')
+                b.set_light('Table','on',True)
+                b.set_light('Table','ct',400)
+
     else:
         print('Sending Hue Update to turn off')
-        
+            
         b.set_light('Table','on',False)
 
 
