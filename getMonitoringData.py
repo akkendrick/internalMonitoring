@@ -98,7 +98,7 @@ def send_hueUpdate(lumVal):
 
     # Check if luminosity and time meet conditions to turn on
     # I could set a schedule, leaving it this way for now
-    if (float(lumVal) < 10) 
+    if (float(lumVal) < 10):
         # Specify times of day to limit hue updates
         now = datetime.datetime.now()
         todayLateLim = now.replace(hour=23, minute=45, second=0, microsecond=0)
@@ -116,7 +116,7 @@ def send_hueUpdate(lumVal):
                 print('Dinner case')
                 b.set_light('Table','on',True)
                 b.set_light('Table','ct',315)
-            elif (now > todayLate) and (now < todayLateLim)
+            elif (now > todayLate) and (now < todayLateLim):
                 print('Late Case')
                 b.set_light('Table','on',True)
                 b.set_light('Table','ct',400)
