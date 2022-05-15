@@ -22,11 +22,10 @@ int INTERVAL = 1;
 
 // Define weather variables
 float bmeData[4];
-#define BME_PWR 6
-#define US100_PWR 7
+#define Sensor_PWR 6
 #define US100_TRIG 4
 #define US100_ECHO 5
-#define BH_PWR 3
+
 // Create an rtc object for tracking time
 RTCZero rtc;
 
@@ -187,37 +186,6 @@ void getBMEData(float bmeData[4]) {
 
 }
 
-float getUS100Data()  {
-  long timeHigh;
-
-    
-  // Power ON the US-100 board
-  pinMode(US100_PWR, OUTPUT);
-  digitalWrite(US100_PWR, HIGH);
-  pinMode(US100_TRIG, OUTPUT);
-  pinMode(US100_ECHO, INPUT);
-
-  int val = 0;
-  val = digitalRead(US100_PWR);   // read the  pin
-  delay(10);
-
-  // Make sure this pin is low
-  digitalWrite(US100_TRIG, LOW);
-  delayMicroseconds(2);
-  // Tell the US-100 to send an echo
-  digitalWrite(US100_TRIG, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(US100_TRIG, LOW);
-  
-  // Measure how long it takes for the pulse to return
-  // this is in microseconds
-  timeHigh = pulseIn(US100_ECHO, HIGH);
-  US100_time = timeHigh;
-  
-  digitalWrite(US100_PWR, LOW);
-  return US100_time;
-}
-
 
 float getLightData() {
     // Power ON the BH1750
@@ -238,6 +206,7 @@ float getLightData() {
   return lux;
 
 }
+
 /****************************************
  * Main Functions
 ****************************************/
@@ -283,77 +252,6 @@ void loop() {
   printValues();
   ///////////////////////////////////////////////////
 
-  // Get distance data
-  ///////////////////////////////////////////////////
-  // Use temperature to calculate speed of sound, this is in m/s
-  double soundSpeed;
-  soundSpeed = 331.3 + 0.606 * bmeData[0];
-  Serial.print("Sound speed is:");
-  Serial.println(soundSpeed);
-
-  US100_time1 = getUS100Data();
-  US100_distance1 = soundSpeed * US100_time1 / 2000;
-  
-  int iter = 0;
-  
-  while (US100_distance1 > boxDistance) {
-    US100_time1 = getUS100Data();
-    US100_distance1 = soundSpeed * US100_time1 / 2000;
-    iter = iter + 1;
-    if (iter >= 20) {
-      US100_time1 = 630/soundSpeed * 2000;
-      break;
-    }
-  }
-
-  delay(10); // This delay ensures that US100 data is all good
-  US100_time2 = getUS100Data();
-  US100_distance2 = soundSpeed * US100_time2 / 2000;
-  
-  iter = 0;
-  
-  while (US100_distance2 > boxDistance) {
-    US100_time2 = getUS100Data();
-    US100_distance2 = soundSpeed * US100_time2 / 2000;
-    iter = iter + 1;
-    if (iter > 20) {
-      US100_time2 = 630/soundSpeed * 2000;
-      break;
-    }
-  }
-  
-  delay(10); // This delay ensures that US100 data is all good
-  US100_time3 = getUS100Data();
-  US100_distance3 = soundSpeed * US100_time3 / 2000;
-  
-  iter = 0;
-  
-  while (US100_distance3 > boxDistance) {
-    US100_time3 = getUS100Data();
-    US100_distance3 = soundSpeed * US100_time3 / 2000;
-    iter = iter + 1;
-    if (iter > 20) {
-      US100_time3 = 630/soundSpeed * 2000;
-      break;
-    }
-  }
-
-  US100_avgTime = (US100_time1 + US100_time2 + US100_time3)/3;
-  Serial.print("Time high is:");
-  Serial.println(US100_avgTime);
-
-  
-  // Use US-100 measurement and speed of sound to calculate object distance
-  // this is divided by two because the echo is bouncing off a surface
-  // and returning to the sensor
-  // soundSpeed is in m/s, US100 time in us, we want mm output
-  US100_distance = soundSpeed * US100_avgTime / 2000;
-  // Use defined box distance to calculate accumulation
-  accumulatedHeight = boxDistance - US100_distance;
-  
-  Serial.print("The raw distance is (mm):");
-  Serial.println(US100_distance);
-
   // Get light sensor data
   ///////////////////////////////////////////////////
   lux = getLightData();
@@ -389,17 +287,6 @@ void loop() {
   }
   else {
     Serial.println("Pressure data failed to send.");
-    // Sleep and try again
-    MQTTfail = true;
-  }
-
-  delay(100); // This delay ensures that BME data upload is all good
-  MQTTBool = client.publish(distance_topic, String(accumulatedHeight).c_str());
-  if (MQTTBool) {
-    Serial.println("Distance Data Sent");
-  }
-  else {
-    Serial.println("Distance data failed to send.");
     // Sleep and try again
     MQTTfail = true;
   }
