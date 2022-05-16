@@ -13,18 +13,16 @@
 
 hp_BH1750 BH1750;       //  create the sensor
 
-
 // Define wifi parameters
 char ssid[] = SECRET_SSID;
 char pass[] = SECRET_PASS;
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
 int INTERVAL = 1;
 
-// Define weather variables
+// Define data storage variables
 float bmeData[4];
+float MQTTData[5];
 #define Sensor_PWR 6
-#define US100_TRIG 4
-#define US100_ECHO 5
 
 // Create an rtc object for tracking time
 RTCZero rtc;
@@ -50,18 +48,6 @@ PubSubClient client(mqtt_server, 1883, wifiClient);
 #define SEALEVELPRESSURE_HPA (1013.25)
 
 Adafruit_BME280 bme; // I2C
-
-float US100_time;
-unsigned long delayTime;
-unsigned int firstRun = 1;
-
-// Changing for room test
-unsigned long boxDistance = 700;
-
-// the US-100 module has the jumper cap on the back.
-unsigned int HighLen = 0;
-unsigned int LowLen  = 0;
-unsigned int Len_mm  = 0;
 
 float lux;
 
@@ -140,9 +126,9 @@ void getBMEData(float bmeData[4]) {
       while(iter < 10) {
         Serial.println("Stuck in BME Loop");
         // Try cycling BME280 power
-        digitalWrite(BME_PWR, LOW);
+        digitalWrite(Sensor_PWR, LOW);
         delay(50);
-        digitalWrite(BME_PWR, HIGH);
+        digitalWrite(Sensor_PWR, HIGH);
         delay(50);
         iter++;
 
@@ -188,24 +174,100 @@ void getBMEData(float bmeData[4]) {
 
 
 float getLightData() {
-    // Power ON the BH1750
-    pinMode(BH_PWR, OUTPUT);
-    digitalWrite(BH_PWR, HIGH);
     
-  bool avail = BH1750.begin(BH1750_TO_GROUND);
-  
-  BH1750.start();
-  lux=BH1750.getLux();  //  waits until a conversion finished
-  Serial.print("BH1750 status:");
-  Serial.println(avail); 
-  Serial.print("The current lumens are:"); 
-  Serial.println(lux);  
-  
-  digitalWrite(BH_PWR, LOW);
+    bool avail = BH1750.begin(BH1750_TO_GROUND);
+    int iter = 0;
 
+    if (!avail) {
+      // Try restarting the Light sensor 10 times
+      while(iter < 10) {
+        Serial.println("Stuck in BH1750 Loop");
+        // Try cycling power
+        digitalWrite(Sensor_PWR, LOW);
+        delay(100);
+        digitalWrite(Sensor_PWR, HIGH);
+        delay(100);
+        iter++;
+
+        // Update status each iteration
+        bool avail = BH1750.begin(BH1750_TO_GROUND);
+        if (avail) {
+          break;
+        }
+    }
+    }
+
+    avail = BH1750.begin(BH1750_TO_GROUND);
+    if (avail) {
+      
+      BH1750.start();
+      lux=BH1750.getLux();  //  waits until a conversion finished
+      Serial.print("BH1750 status:");
+      Serial.println(avail); 
+      Serial.print("The current lumens are:"); 
+      Serial.println(lux);  
+    }
+    else {
+      lux=0;
+    }
+ 
   return lux;
 
 }
+
+bool sendMQTTData(float MQTTData[5]) {
+  bool MQTTBool;
+  bool MQTTfail;
+  
+  MQTTBool = client.publish(temp_topic, String(MQTTData[0]).c_str());
+  MQTTfail = false;
+  if (MQTTBool) {
+    Serial.println("Temperature Data Sent");
+  }
+  else {
+    Serial.println("Temperature data failed to send.");
+    // Sleep and try again
+    MQTTfail = true;
+  }
+
+  delay(100); // This delay ensures that BME data upload is all good
+  MQTTBool = client.publish(humid_topic, String(MQTTData[3]).c_str());
+  if (MQTTBool) {
+    Serial.println("Humidity Data Sent");
+  }
+  else {
+    Serial.println("Humidity data failed to send.");
+    // Sleep and try again
+    MQTTfail = true;
+  }
+
+  delay(100); // This delay ensures that BME data upload is all good
+  MQTTBool = client.publish(pressure_topic, String(MQTTData[1]).c_str());
+  if (MQTTBool) {
+    Serial.println("Pressure Data Sent");
+  }
+  else {
+    Serial.println("Pressure data failed to send.");
+    // Sleep and try again
+    MQTTfail = true;
+  }
+
+  delay(100); // This delay ensures that BME data upload is all good
+  MQTTBool = client.publish(light_topic, String(MQTTData[4]).c_str());
+  if (MQTTBool) {
+    Serial.println("Light Data Sent");
+  }
+  else {
+    Serial.println("Light data failed to send.");
+    // Sleep and try again
+    MQTTfail = true;
+  }
+  delay(100); // This delay ensures that BME data upload is all good
+  ///////////////////////////////////////////////////
+
+  return MQTTfail;
+}
+
 
 /****************************************
  * Main Functions
@@ -221,12 +283,11 @@ void setup() {
 
     Serial.println();
 
-    // Power ON the BME280 board
-    pinMode(BME_PWR, OUTPUT);
-    digitalWrite(BME_PWR, HIGH);
+    // Power ON the Sensors
+    pinMode(Sensor_PWR, OUTPUT);
+    digitalWrite(Sensor_PWR, HIGH);
 
 }
-
 
 void loop() {
 
@@ -240,9 +301,12 @@ void loop() {
   float US100_time3;
   float US100_avgTime;  
   float accumulatedHeight;
-  bool MQTTBool;
   bool MQTTfail;
-  
+
+  // Power ON the Sensors
+  pinMode(Sensor_PWR, OUTPUT);
+  digitalWrite(Sensor_PWR, HIGH);
+
   connect_MQTT();
   
   // Get BME data
@@ -258,51 +322,13 @@ void loop() {
 
   ///////////////////////////////////////////////////
   // Publish all data to the MQTT Broker
-  MQTTBool = client.publish(temp_topic, String(bmeData[0]).c_str());
-  MQTTfail = false;
-  if (MQTTBool) {
-    Serial.println("Temperature Data Sent");
-  }
-  else {
-    Serial.println("Temperature data failed to send.");
-    // Sleep and try again
-    MQTTfail = true;
-  }
+  MQTTData[0] = bmeData[0];
+  MQTTData[1] = bmeData[1];
+  MQTTData[2] = bmeData[2];
+  MQTTData[3] = bmeData[3];
 
-  delay(100); // This delay ensures that BME data upload is all good
-  MQTTBool = client.publish(humid_topic, String(bmeData[3]).c_str());
-  if (MQTTBool) {
-    Serial.println("Humidity Data Sent");
-  }
-  else {
-    Serial.println("Humidity data failed to send.");
-    // Sleep and try again
-    MQTTfail = true;
-  }
-
-  delay(100); // This delay ensures that BME data upload is all good
-  MQTTBool = client.publish(pressure_topic, String(bmeData[1]).c_str());
-  if (MQTTBool) {
-    Serial.println("Pressure Data Sent");
-  }
-  else {
-    Serial.println("Pressure data failed to send.");
-    // Sleep and try again
-    MQTTfail = true;
-  }
-
-  delay(100); // This delay ensures that BME data upload is all good
-  MQTTBool = client.publish(light_topic, String(lux).c_str());
-  if (MQTTBool) {
-    Serial.println("Light Data Sent");
-  }
-  else {
-    Serial.println("Light data failed to send.");
-    // Sleep and try again
-    MQTTfail = true;
-  }
-  delay(100); // This delay ensures that BME data upload is all good
-  ///////////////////////////////////////////////////
+  MQTTData[4] = lux; 
+  MQTTfail = sendMQTTData(MQTTData);
 
   if (MQTTfail) {
     // Sleep for a short time if all is not good
@@ -324,7 +350,7 @@ void loop() {
 
   // Using built-in LED to indicate when it is awake
   digitalWrite(LED_BUILTIN, LOW);   
-  digitalWrite(BME_PWR, LOW);
+  digitalWrite(Sensor_PWR, LOW);
 
   Serial.println("Going to sleep");
 
